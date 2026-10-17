@@ -1,0 +1,53 @@
+{
+  "authCollection": "users",
+  "tables": {
+    "user_directory": ["id", "name"],
+    "organizations": ["content_hash", "created", "created_by", "description", "first_seen_at", "headquarters", "id", "industry", "key_kind", "kind", "last_seen_at", "name", "natural_key", "org_urn", "size_range", "universal_name", "updated", "updated_by", "url", "last_run"],
+    "profiles": ["about", "connection_degree", "content_hash", "created", "created_by", "current_organization", "first_seen_at", "headline", "id", "is_self", "key_kind", "last_seen_at", "location", "member_urn", "name", "natural_key", "profile_url", "public_id", "updated", "updated_by", "merged_into", "last_run"],
+    "aliases": ["created", "created_by", "id", "kind", "organization", "profile", "updated", "updated_by", "value"],
+    "accounts": ["created", "created_by", "id", "label", "profile", "updated", "updated_by", "user"],
+    "ingestion_runs": ["account", "agent", "capture_schema", "completed_at", "counts", "created", "created_by", "id", "note", "reached_cutoff", "since", "started_at", "status", "surface", "updated", "updated_by"],
+    "sync_state": ["account", "created", "high_water_at", "id", "last_complete_run", "surface", "updated"],
+    "positions": ["content_hash", "created", "created_by", "current", "description", "end_month", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "location", "natural_key", "organization", "organization_name", "profile", "start_month", "title", "updated", "updated_by"],
+    "education": ["content_hash", "created", "created_by", "degree", "end_year", "field", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "natural_key", "organization", "profile", "school_name", "start_year", "updated", "updated_by"],
+    "posts": ["article_url", "author_organization", "author_profile", "comment_count", "content_hash", "created", "created_by", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "media_kind", "natural_key", "post_urn", "posted_at", "reaction_count", "repost_count", "text", "time_precision", "updated", "updated_by", "url", "reshare_of"],
+    "comments": ["author", "comment_urn", "content_hash", "created", "created_by", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "natural_key", "post", "posted_at", "text", "time_precision", "updated", "updated_by", "parent"],
+    "reactions": ["actor", "comment", "content_hash", "created", "created_by", "first_seen_at", "id", "key_kind", "kind", "last_run", "last_seen_at", "natural_key", "post", "updated", "updated_by"],
+    "feed_items": ["account", "actor", "content_hash", "created", "created_by", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "natural_key", "position", "post", "promoted", "reason", "seen_at", "updated", "updated_by"],
+    "notifications": ["account", "actor", "content_hash", "created", "created_by", "first_seen_at", "id", "key_kind", "kind", "last_run", "last_seen_at", "natural_key", "notification_urn", "occurred_at", "target_post", "target_profile", "text", "time_precision", "updated", "updated_by", "url"],
+    "connections": ["account", "connected_at", "content_hash", "created", "created_by", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "natural_key", "profile", "status", "time_precision", "updated", "updated_by"],
+    "invitations": ["account", "content_hash", "created", "created_by", "direction", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "message", "natural_key", "profile", "sent_at", "status", "time_precision", "updated", "updated_by"],
+    "follows": ["account", "content_hash", "created", "created_by", "direction", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "natural_key", "organization", "profile", "updated", "updated_by"],
+    "conversations": ["account", "content_hash", "created", "created_by", "first_seen_at", "id", "key_kind", "last_activity_at", "last_run", "last_seen_at", "natural_key", "thread_urn", "title", "updated", "updated_by", "url"],
+    "conversation_participants": ["content_hash", "conversation", "created", "created_by", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "natural_key", "profile", "updated", "updated_by"],
+    "messages": ["attachments", "body", "content_hash", "conversation", "created", "created_by", "event_urn", "first_seen_at", "id", "key_kind", "last_run", "last_seen_at", "natural_key", "sender", "sent_at", "time_precision", "updated", "updated_by"],
+    "crm_links": ["app", "created", "created_by", "id", "note", "profile", "target_id", "target_url", "updated", "updated_by"],
+    "audit_log": ["action", "actor", "actor_type", "changes", "collection", "created", "id", "record", "updated"]
+  },
+  "search": {
+    "indexes": {
+      "profiles": {
+        "table": "profiles_search",
+        "collection": "profiles",
+        "columns": ["name", "headline", "about"],
+        "snippetColumn": "headline",
+        "weights": [5, 3, 1]
+      },
+      "posts": {
+        "table": "posts_search",
+        "collection": "posts",
+        "columns": ["text"],
+        "snippetColumn": "text"
+      },
+      "messages": {
+        "table": "messages_search",
+        "collection": "messages",
+        "columns": ["body"],
+        "snippetColumn": "body"
+      }
+    }
+  },
+  "timeoutMs": 2000,
+  "maxRows": 500,
+  "maxBytes": 1048576
+}
