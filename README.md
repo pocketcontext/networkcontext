@@ -62,6 +62,6 @@ All tests use synthetic records and temporary databases.
 ## Status and next steps
 
 - Local only. No container, CI, Google OAuth/Workspace JIT, R2 replication or ONCE deployment yet; hosting needs those, filtered snapshots by `account` for private collections, private search indexes, and separate authorization.
-- The skill launcher pins `PUBLISH_COMMIT`, a placeholder until this repository is published; use the installed package (`uv pip install -e .`) meanwhile.
+- The skill launcher pins a published package commit. After client changes, push, update the pin and run the copied launcher from an unrelated directory.
 - No profile merge command yet: two records for one person arise only when separate captures showed only a URN and only a URL. An official-export converter (CSV to envelopes) is not included.
 - LinkedIn's User Agreement restricts automated access. Capture only with the account owner's decision, at human pace, and keep the archive private.
