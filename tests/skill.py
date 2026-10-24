@@ -54,6 +54,7 @@ def main():
         shutil.copytree(ROOT / 'src/networkcontext_client', installed / 'networkcontext_client', ignore=shutil.ignore_patterns('__pycache__'))
         port = support.free_port()
         env = {'PATH': os.environ.get('PATH', ''), 'HOME': str(tmp / 'home'), 'XDG_CACHE_HOME': str(tmp / 'cache'),
+               'XDG_STATE_HOME': str(tmp / 'state'),
                'XDG_CONFIG_HOME': str(tmp / 'config'), 'NETWORKCONTEXT_HOME': str(tmp / 'data')}
         outputs = []
 
@@ -86,8 +87,21 @@ def main():
                 print('Wrote schema snapshots from an isolated server')
                 return
             assert data('whoami')['email'] == 'owner@networkcontext.localhost'
-            session, = (tmp / 'cache/networkcontext').glob('*.json')
+            session, = (tmp / 'state/networkcontext').glob('*.json')
             assert stat.S_IMODE(session.stat().st_mode) == 0o600 and password not in session.read_text()
+            assert not (tmp / 'cache').exists(), 'the session lives in XDG state, not the cache'
+            # A session left in the cache by an older client is moved once; logout removes both.
+            legacy = tmp / 'cache/networkcontext' / session.name
+            legacy.parent.mkdir(parents=True)
+            session.rename(legacy)
+            assert data('whoami')['email'] == 'owner@networkcontext.localhost'
+            assert session.exists() and not legacy.exists()
+            assert stat.S_IMODE(session.stat().st_mode) == 0o600
+            legacy.write_text(session.read_text())
+            run('logout')
+            assert not session.exists() and not legacy.exists()
+            assert data('whoami', NETWORKCONTEXT_SESSION_DIR=str(tmp / 'sessions'))['email'] == 'owner@networkcontext.localhost'
+            assert len(list((tmp / 'sessions').glob('*.json'))) == 1 and not session.exists()
             assert run('check')[0].startswith('OK')
             snapshot = installed / 'networkcontext_client/schema.json'
             original = snapshot.read_text()

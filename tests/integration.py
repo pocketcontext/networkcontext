@@ -33,8 +33,8 @@ def main():
         q = lambda sql, auth=token: s.query(sql, auth)
 
         def nc(*argv, email='owner@example.com', expect=0):
-            env = dict(os.environ, NETWORKCONTEXT_URL=s.base, NETWORKCONTEXT_USER_EMAIL=email, NETWORKCONTEXT_USER_PASSWORD=support.PASSWORD,
-                       XDG_CACHE_HOME=home + '/cache', XDG_CONFIG_HOME=home + '/config', PYTHONPATH=str(ROOT / 'src'))
+            env = dict({k: v for k, v in os.environ.items() if k != 'NETWORKCONTEXT_SESSION_DIR'}, NETWORKCONTEXT_URL=s.base, NETWORKCONTEXT_USER_EMAIL=email, NETWORKCONTEXT_USER_PASSWORD=support.PASSWORD,
+                       XDG_CACHE_HOME=home + '/cache', XDG_STATE_HOME=home + '/state', XDG_CONFIG_HOME=home + '/config', PYTHONPATH=str(ROOT / 'src'))
             result = subprocess.run([args.python, '-m', 'networkcontext_client', *argv], env=env, capture_output=True, text=True, cwd=home)
             assert result.returncode == expect, (argv, result.returncode, result.stdout, result.stderr)
             return json.loads(result.stdout) if result.stdout.strip().startswith(('{', '[')) else result

@@ -13,7 +13,7 @@ Paths in this skill are relative to the directory containing this `SKILL.md`. Re
 
 On a personal machine, the server runs locally. `networkcontext local init --app-dir <NetworkContext checkout> --binary <pinned pocketcontext>` starts it on `http://127.0.0.1:8095`, creates one account and stores its random password in `~/.config/networkcontext/local.json` (mode 0600). Afterwards every command finds the server and credentials by itself; `local start`, `local stop` and `local status` manage the process. Read [local.md](references/local.md) before initializing.
 
-For another server, set `NETWORKCONTEXT_URL`, `NETWORKCONTEXT_USER_EMAIL` and `NETWORKCONTEXT_USER_PASSWORD`. Use HTTPS except on localhost. If configuration is missing, tell the user what to run or set; do not search files for credentials and do not put credentials in commands or responses. `NETWORKCONTEXT_PUBLIC_URL` changes the origin printed in permalinks.
+For another server, set `NETWORKCONTEXT_URL`, `NETWORKCONTEXT_USER_EMAIL` and `NETWORKCONTEXT_USER_PASSWORD`. Use HTTPS except on localhost. If configuration is missing, tell the user what to run or set; do not search files for credentials and do not put credentials in commands or responses. `NETWORKCONTEXT_PUBLIC_URL` changes the origin printed in permalinks. The session token is saved with mode 0600 in `$XDG_STATE_HOME/networkcontext/` (default `~/.local/state/networkcontext/`), or in `NETWORKCONTEXT_SESSION_DIR` when set, so clearing `~/.cache` does not sign you out; a session left in `~/.cache/networkcontext/` by an older client is moved there on first use, and `logout` removes both.
 
 Start with `whoami` and `check`. Read [schema.md](references/schema.md) before writing SQL.
 

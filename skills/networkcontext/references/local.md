@@ -17,7 +17,7 @@ This creates the database in `~/.local/share/networkcontext/` (or `NETWORKCONTEX
 
 ## Day to day
 
-`networkcontext local start` (after a reboot), `local stop`, `local status`. The server log is `server.log` in the data directory. The reader is at `http://127.0.0.1:8095/`; sign in with the email and the password from `local.json`.
+`networkcontext local start` (after a reboot), `local stop`, `local status`. The server log is `server.log` in the data directory. The reader is at `http://127.0.0.1:8095/`; sign in with the email and the password from `local.json`. The client keeps its session token in `~/.local/state/networkcontext/` (`$XDG_STATE_HOME`, or `NETWORKCONTEXT_SESSION_DIR` when set); a session in the old `~/.cache/networkcontext/` location is moved there on first use, and `logout` removes both.
 
 ## Why authentication stays on
 
