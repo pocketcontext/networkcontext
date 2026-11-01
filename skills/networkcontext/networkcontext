@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["networkcontext-client @ git+https://github.com/pocketcontext/networkcontext.git@1e0d5e4db950a71284f57a019976e281e38ead54"]
+# dependencies = ["networkcontext-client @ git+https://github.com/pocketcontext/networkcontext.git@7fe3d654d4b25f709519768ad9c9870a584707a2"]
 # ///
 from networkcontext_client.cli import main
 
