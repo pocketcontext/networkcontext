@@ -44,6 +44,8 @@ For a server run by hand, run it from this directory so `pocketcontext.json`, mi
 
 ## Validation
 
+Run `python3 tests/configuration.py` for saved login settings, precedence, account isolation and logout behavior.
+
 ```sh
 S=/absolute/path/to/pinned/pocketcontext; PY=.venv/bin/python
 python3 tests/keys.py
@@ -65,3 +67,11 @@ All tests use synthetic records and temporary databases.
 - The skill launcher pins a published package commit. After client changes, push, update the pin and run the copied launcher from an unrelated directory.
 - No profile merge command yet: two records for one person arise only when separate captures showed only a URN and only a URL. An official-export converter (CSV to envelopes) is not included.
 - LinkedIn's User Agreement restricts automated access. Capture only with the account owner's decision, at human pace, and keep the archive private.
+
+## Saved CLI login settings
+
+Run `networkcontext login --url https://server.example.com --email you@example.com --password`. Successful explicit login writes `default.json` containing only the URL and email alongside the per-server/account token files in `$XDG_STATE_HOME/networkcontext/` (default `~/.local/state/networkcontext/`), or `NETWORKCONTEXT_SESSION_DIR`. Directories are mode 0700; files are mode 0600. Later commands need no URL/email exports. Passwords remain outside these files.
+
+Connection options override `NETWORKCONTEXT_URL` / `NETWORKCONTEXT_USER_EMAIL`, which override saved defaults. Put `--url` and `--email` before any command, or after a command unless that command already uses the option for a domain value. Only successful explicit login changes the default; ordinary commands, refreshes and failed login do not. `logout` removes the selected token and retains defaults; `logout --forget` also removes the default when it matches that account/server. Old cache sessions are not migrated; sign in again.
+
+`local init` still owns the separate private local-server configuration. It supplies fallback connection settings; its stored password is used only when both URL and email match. `account --url` and `crm-link --url` retain their domain meanings.

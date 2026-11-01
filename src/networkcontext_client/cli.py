@@ -20,6 +20,7 @@ from pathlib import Path
 from importlib.resources import files
 import re
 import sys
+import stat
 import tempfile
 import urllib.error
 import urllib.parse
@@ -74,21 +75,102 @@ def dump(data, pretty=False):
     return json.dumps(data, separators=(',', ':'), ensure_ascii=False)
 
 
-def config():
-    saved = local.load() or {}
-    url = (os.environ.get(ENV[0]) or saved.get('url') or '').rstrip('/')
-    email = os.environ.get(ENV[1]) or saved.get('email') or ''
-    password = os.environ.get(ENV[2]) or (saved.get('password') if email == saved.get('email') else '')
+def config(args=None):
+    saved = read_default()
+    url = (getattr(args, 'connection_url', None) or os.environ.get(ENV[0]) or saved.get('url') or '').rstrip('/')
+    email = getattr(args, 'connection_email', None) or os.environ.get(ENV[1]) or saved.get('email') or ''
+    password = os.environ.get(ENV[2])
+    local_settings = local.load() or {}
+    url = url or local_settings.get('url', '')
+    email = email or local_settings.get('email', '')
+    if not password and url == local_settings.get('url') and email == local_settings.get('email'):
+        password = local_settings.get('password')
     if not url or not email:
-        raise Fail(2, 'NetworkContext is not configured: run `networkcontext local init --app-dir <dir>` on this machine, or set '
-                   'NETWORKCONTEXT_URL and NETWORKCONTEXT_USER_EMAIL. Do not look for credentials elsewhere.')
+        raise Fail(2, 'Configure networkcontext with login --url URL --email EMAIL, or set ' + ', '.join(ENV[:2]))
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
-        raise Fail(2, 'NETWORKCONTEXT_URL must be an HTTP(S) URL without credentials, query, or fragment')
+        raise Fail(2, '--url must be an HTTP(S) URL without credentials, query, or fragment')
     if parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
         raise Fail(2, 'Use HTTPS for a remote NetworkContext server')
-    public = (os.environ.get('NETWORKCONTEXT_PUBLIC_URL') or url).rstrip('/')
-    return {'url': url, 'email': email, 'password': hide(password), 'public': public}
+    if not isinstance(email, str) or not email.strip() or any(c.isspace() for c in email):
+        raise Fail(2, '--email must be a nonempty account email without whitespace')
+    return {'url': url, 'email': email, 'password': hide(password), 'public': (os.environ.get('NETWORKCONTEXT_PUBLIC_URL') or url).rstrip('/')}
+
+
+def state_dir():
+    folder = os.environ.get('NETWORKCONTEXT_SESSION_DIR')
+    return Path(folder) if folder else Path(os.environ.get('XDG_STATE_HOME') or Path.home() / '.local' / 'state') / 'networkcontext'
+
+
+def default_file():
+    return state_dir() / 'default.json'
+
+
+def private_json(path):
+    """Read only a private regular file, never a symlink or another user's state."""
+    parent = path.parent.lstat()
+    if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != os.getuid() or stat.S_IMODE(parent.st_mode) != 0o700:
+        raise ValueError('unsafe state directory')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd) as handle:
+        info = os.fstat(handle.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600 or info.st_size > 65536:
+            raise ValueError('unsafe state file')
+        return json.load(handle)
+
+
+def read_default():
+    try:
+        value = private_json(default_file())
+        if not isinstance(value, dict) or set(value) != {'url', 'email'} or not all(isinstance(value[k], str) and value[k] for k in value):
+            raise ValueError('invalid default')
+        return value
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError, TypeError):
+        raise Fail(2, 'Cannot read private default.json; remove or repair it before continuing.') from None
+
+
+def write_private(path, value):
+    temporary = None
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        info = path.parent.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            raise OSError('unsafe state directory')
+        with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, prefix='.session-', delete=False) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), 0o600)
+            json.dump(value, handle)
+        os.replace(temporary, path)
+        return True
+    except OSError:
+        say('note: private session settings could not be saved; check the state directory permissions')
+        return False
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def save_default(cfg, session):
+    saved = load_session(cfg)
+    if not saved or saved.get('token') != session.get('token'):
+        raise Fail(1, 'Login succeeded but the session was not saved; default unchanged.')
+    if not write_private(default_file(), {k: cfg[k] for k in ('url', 'email')}):
+        raise Fail(1, 'Login succeeded but default settings were not saved.')
+
+
+def logout(cfg, forget=False):
+    session_file(cfg).unlink(missing_ok=True)
+    if forget and read_default() == {k: cfg[k] for k in ('url', 'email')}:
+        default_file().unlink(missing_ok=True)
+
+
+def connection_options(parser, url=True, email=True):
+    if url:
+        parser.add_argument('--url', dest='connection_url', default=argparse.SUPPRESS, help='application server URL (overrides environment and saved default)')
+    if email:
+        parser.add_argument('--email', dest='connection_email', default=argparse.SUPPRESS, help='account email (overrides environment and saved default)')
 
 
 # Session file: one per server URL and email, readable only by the current user. It lives in
@@ -99,22 +181,12 @@ def session_name(cfg):
 
 
 def session_file(cfg):
-    folder = os.environ.get('NETWORKCONTEXT_SESSION_DIR')
-    if not folder:
-        state = os.environ.get('XDG_STATE_HOME') or str(Path.home() / '.local' / 'state')
-        folder = str(Path(state) / 'networkcontext')
-    return Path(folder) / session_name(cfg)
-
-
-def legacy_session_file(cfg):
-    """Where clients before ENG-55 kept the session; read once and moved."""
-    base = os.environ.get('XDG_CACHE_HOME') or str(Path.home() / '.cache')
-    return Path(base) / 'networkcontext' / session_name(cfg)
+    return state_dir() / session_name(cfg)
 
 
 def read_session(cfg, path):
     try:
-        session = json.loads(path.read_text())
+        session = private_json(path)
         if not isinstance(session, dict) or session.get('url') != cfg['url'] or session.get('email') != cfg['email']:
             return None
         return session if isinstance(session.get('token'), str) and hide(session['token']) else None
@@ -123,30 +195,11 @@ def read_session(cfg, path):
 
 
 def load_session(cfg):
-    path = session_file(cfg)
-    if path.exists():
-        return read_session(cfg, path)
-    legacy = legacy_session_file(cfg)
-    session = read_session(cfg, legacy)
-    if session is not None and save_session(cfg, session):
-        legacy.unlink(missing_ok=True)
-    return session
+    return read_session(cfg, session_file(cfg))
 
 
 def save_session(cfg, session):
-    path = session_file(cfg)
-    try:
-        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        os.chmod(path.parent, 0o700)
-        with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, prefix='.session-', delete=False) as handle:
-            temporary = Path(handle.name)
-            os.fchmod(handle.fileno(), 0o600)
-            json.dump(session, handle)
-        os.replace(temporary, path)
-        return True
-    except OSError as error:
-        say(f'note: session not saved ({error.strerror}); sign-in will be required again')
-        return False
+    return write_private(session_file(cfg), session)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -187,6 +240,11 @@ def login(cfg):
     status, data = send(cfg, 'POST', '/api/collections/users/auth-with-password', {'identity': cfg['email'], 'password': cfg['password']})
     if status != 200 or not isinstance(data, dict) or 'token' not in data:
         raise Fail(1, f'login as {cfg["email"]} failed: HTTP {status}. Check the NetworkContext configuration with the user. User credentials only.')
+    record = data.get('record')
+    if (not isinstance(data.get('token'), str) or not data['token'] or not isinstance(record, dict)
+            or record.get('collectionName') != 'users' or not record.get('id')
+            or not isinstance(record.get('email'), str) or record['email'].casefold() != cfg['email'].casefold()):
+        raise Fail(1, 'Authentication returned an unexpected identity; no session saved.')
     session = {'url': cfg['url'], 'email': cfg['email'], 'token': hide(data['token'])}
     save_session(cfg, session)
     return session
@@ -459,12 +517,14 @@ def run(args):
         return 0
     if args.command == 'local':
         return run_local(args)
-    cfg = config()
+    cfg = config(args=args)
+    if args.command == 'login':
+        result = login(cfg)
+        save_default(cfg, result)
+        say(f'Signed in as {cfg["email"]} at {cfg["url"]}', sys.stdout)
+        return 0
     if args.command == 'logout':
-        path = session_file(cfg)
-        path.unlink(missing_ok=True)
-        legacy_session_file(cfg).unlink(missing_ok=True)
-        say(f'removed {path}', sys.stdout)
+        logout(cfg, args.forget)
         return 0
     client = Client(cfg)
     if args.command == 'check':
@@ -620,6 +680,8 @@ def parse(argv):
             command.add_argument(argument, help=argument_help)
         return command
 
+    login_parser = add('login', 'sign in and save the default server and account')
+    login_parser.add_argument('--password', action='store_true', help='use password from environment or matching local setup')
     loc = add('local', 'manage the private loopback server on this machine')
     loc.add_argument('action', choices=['init', 'start', 'stop', 'status'])
     loc.add_argument('--app-dir', help='NetworkContext application directory (or NETWORKCONTEXT_APP_DIR)')
@@ -665,6 +727,10 @@ def parse(argv):
     crm.add_argument('--note')
     add('normalize', 'print the canonical LinkedIn identifiers of a URL or URN', ('value', 'URL or URN'))
     add('logout', 'remove the cached token')
+    connection_options(parser)
+    for name, command in commands.choices.items():
+        connection_options(command, url='--url' not in command._option_string_actions, email='--email' not in command._option_string_actions)
+    commands.choices['logout'].add_argument('--forget', action='store_true', help='also forget matching saved defaults')
     args = parser.parse_args(argv)
     args.pretty = getattr(args, 'pretty', False)
     if args.command == 'run':

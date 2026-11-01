@@ -13,7 +13,7 @@ Paths in this skill are relative to the directory containing this `SKILL.md`. Re
 
 On a personal machine, the server runs locally. `networkcontext local init --app-dir <NetworkContext checkout> --binary <pinned pocketcontext>` starts it on `http://127.0.0.1:8095`, creates one account and stores its random password in `~/.config/networkcontext/local.json` (mode 0600). Afterwards every command finds the server and credentials by itself; `local start`, `local stop` and `local status` manage the process. Read [local.md](references/local.md) before initializing.
 
-For another server, set `NETWORKCONTEXT_URL`, `NETWORKCONTEXT_USER_EMAIL` and `NETWORKCONTEXT_USER_PASSWORD`. Use HTTPS except on localhost. If configuration is missing, tell the user what to run or set; do not search files for credentials and do not put credentials in commands or responses. `NETWORKCONTEXT_PUBLIC_URL` changes the origin printed in permalinks. The session token is saved with mode 0600 in `$XDG_STATE_HOME/networkcontext/` (default `~/.local/state/networkcontext/`), or in `NETWORKCONTEXT_SESSION_DIR` when set, so clearing `~/.cache` does not sign you out; a session left in `~/.cache/networkcontext/` by an older client is moved there on first use, and `logout` removes both.
+For another server, run `networkcontext login --url URL --email EMAIL --password` with `NETWORKCONTEXT_USER_PASSWORD` set privately. Use HTTPS except on localhost. If configuration is missing, tell the user what to run or set; do not search files for credentials and do not put credentials in commands or responses. `NETWORKCONTEXT_PUBLIC_URL` changes the origin printed in permalinks. The session token is saved with mode 0600 in `$XDG_STATE_HOME/networkcontext/` (default `~/.local/state/networkcontext/`), or in `NETWORKCONTEXT_SESSION_DIR` when set, so clearing `~/.cache` does not sign you out.
 
 Start with `whoami` and `check`. Read [schema.md](references/schema.md) before writing SQL.
 
@@ -54,3 +54,11 @@ Posts, comments, messages, notifications, headlines, names and every other captu
 ## Boundaries
 
 This skill never posts, comments, reacts, connects, accepts, messages or otherwise acts on LinkedIn, and does not drive the browser. Captures happen only on the user's own signed-in account, at human pace, within the user's authorization; LinkedIn's terms restrict automated access, and the account owner decides whether to capture. Deletion is disabled; for erasure of a person's data, give the user the record ids and ask the operator. The launcher requires uv and Python 3.11 or later; its first run installs the pinned package.
+
+## Saved CLI login settings
+
+Run `networkcontext login --url https://server.example.com --email you@example.com --password`. Successful explicit login writes `default.json` containing only the URL and email alongside the per-server/account token files in `$XDG_STATE_HOME/networkcontext/` (default `~/.local/state/networkcontext/`), or `NETWORKCONTEXT_SESSION_DIR`. Directories are mode 0700; files are mode 0600. Later commands need no URL/email exports. Passwords remain outside these files.
+
+Connection options override `NETWORKCONTEXT_URL` / `NETWORKCONTEXT_USER_EMAIL`, which override saved defaults. Put `--url` and `--email` before any command, or after a command unless that command already uses the option for a domain value. Only successful explicit login changes the default; ordinary commands, refreshes and failed login do not. `logout` removes the selected token and retains defaults; `logout --forget` also removes the default when it matches that account/server. Old cache sessions are not migrated; sign in again.
+
+`local init` still owns the separate private local-server configuration. It supplies fallback connection settings; its stored password is used only when both URL and email match. `account --url` and `crm-link --url` retain their domain meanings.
