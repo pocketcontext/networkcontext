@@ -76,9 +76,11 @@ def dump(data, pretty=False):
 
 
 def config(args=None):
-    saved = read_default()
-    url = (getattr(args, 'connection_url', None) or os.environ.get(ENV[0]) or saved.get('url') or '').rstrip('/')
-    email = getattr(args, 'connection_email', None) or os.environ.get(ENV[1]) or saved.get('email') or ''
+    url = getattr(args, 'connection_url', None) or os.environ.get(ENV[0])
+    email = getattr(args, 'connection_email', None) or os.environ.get(ENV[1])
+    saved = read_default() if not (url and email) else {}
+    url = (url or saved.get('url') or '').rstrip('/')
+    email = email or saved.get('email') or ''
     password = os.environ.get(ENV[2])
     local_settings = local.load() or {}
     url = url or local_settings.get('url', '')
@@ -87,12 +89,18 @@ def config(args=None):
         password = local_settings.get('password')
     if not url or not email:
         raise Fail(2, 'Configure networkcontext with login --url URL --email EMAIL, or set ' + ', '.join(ENV[:2]))
-    parsed = urllib.parse.urlsplit(url)
+    if any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in url):
+        raise Fail(2, '--url cannot contain whitespace or control characters')
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        parsed.port
+    except ValueError:
+        raise Fail(2, '--url must have a valid host and port') from None
     if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise Fail(2, '--url must be an HTTP(S) URL without credentials, query, or fragment')
     if parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
         raise Fail(2, 'Use HTTPS for a remote NetworkContext server')
-    if not isinstance(email, str) or not email.strip() or any(c.isspace() for c in email):
+    if not isinstance(email, str) or not email.strip() or '@' not in email or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in email):
         raise Fail(2, '--email must be a nonempty account email without whitespace')
     return {'url': url, 'email': email, 'password': hide(password), 'public': (os.environ.get('NETWORKCONTEXT_PUBLIC_URL') or url).rstrip('/')}
 

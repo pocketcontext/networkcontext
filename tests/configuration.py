@@ -96,8 +96,14 @@ class ConfigurationTest(unittest.TestCase):
                 cli.run(args)
             send.assert_not_called()
 
+    def test_explicit_login_repairs_malformed_default(self):
+        self.sign_in()
+        cli.default_file().write_text('{bad json')
+        self.sign_in()
+        self.assertEqual(cli.read_default()['email'], self.cfg['email'])
+
     def test_invalid_remote_url_rejected_before_network(self):
-        for url in ('http://remote.example.com', 'https://a:b@example.com', 'https://example.com?token=x'):
+        for url in ('http://remote.example.com', 'https://a:b@example.com', 'https://example.com?token=x', 'https://example.com:bad', 'https://example.com:99999', 'https://exam\nple.com'):
             with patch.object(cli, 'send') as send, self.assertRaises(cli.Fail):
                 cli.run(cli.parse(['login', '--password', '--url', url, '--email', self.cfg['email']]))
             send.assert_not_called()
